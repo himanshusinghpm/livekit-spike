@@ -1,16 +1,11 @@
 // spike.js
-require('dotenv').config();
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-const YOUTUBE_VIDEO_ID = "JZO1vXkkpXY";
-const KICK_CHANNEL_SLUG = "soulaman";
-
-if (!YOUTUBE_API_KEY) {
-    throw new Error("Missing YOUTUBE_API_KEY. Copy .env.example to .env and add your key.");
-}
+const YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"; // Put your key back here
+const YOUTUBE_VIDEO_ID = "YOUR_LIVE_VIDEO_ID";  // Put a currently live YT ID here
+const KICK_CHANNEL_SLUG = "YOUR_KICK_SLUG";     // Put a currently live Kick slug here
 
 async function getYouTubeLiveStats(videoId) {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`;
@@ -34,21 +29,16 @@ async function getKickLiveStatsStealth(slug) {
     let browser;
     
     try {
-        // Launch a hidden browser instance
         browser = await puppeteer.launch({ headless: "new" });
         const page = await browser.newPage();
-        
-        // Navigate directly to the JSON endpoint
         await page.goto(url, { waitUntil: 'domcontentloaded' });
-        
-        // Extract the raw text from the browser body
-        const content = await page.evaluate(() => document.querySelector("body").innerText);
+        const content = await page.evaluate(() => document.body.innerText);
         const data = JSON.parse(content);
         
         if (data.livestream) {
             return data.livestream.viewer_count;
         }
-        return 0; // Offline
+        return 0; 
     } catch (error) {
         console.error("Kick Stealth API Error:", error.message);
         return null;
@@ -60,23 +50,23 @@ async function getKickLiveStatsStealth(slug) {
 }
 
 async function runSpike() {
-    console.log("Starting Data Extraction Spike (Stealth Mode)...\n");
-    const startTime = Date.now();
+    console.log("Starting Data Extraction Spike (Datacenter Test)...\n");
 
     const [ytViewers, kickViewers] = await Promise.all([
         getYouTubeLiveStats(YOUTUBE_VIDEO_ID),
         getKickLiveStatsStealth(KICK_CHANNEL_SLUG)
     ]);
 
-    const executionTime = (Date.now() - startTime) / 1000;
+    // CORRECTNESS FIX: Strict Null Checking
+    const isYtValid = typeof ytViewers === 'number';
+    const isKickValid = typeof kickViewers === 'number';
 
     const result = {
         timestamp: new Date().toISOString(),
-        youtube_ccv: ytViewers,
-        kick_ccv: kickViewers,
-        total_ccv: (ytViewers || 0) + (kickViewers || 0),
-        status: (ytViewers === null || kickViewers === null) ? "PARTIAL_FAILURE" : "SUCCESS",
-        execution_time_seconds: executionTime
+        youtube_ccv: isYtValid ? ytViewers : null,
+        kick_ccv: isKickValid ? kickViewers : null,
+        total_ccv: (isYtValid && isKickValid) ? (ytViewers + kickViewers) : null,
+        status: (isYtValid && isKickValid) ? "SUCCESS" : "ERROR_DATA_MISSING"
     };
 
     console.log("\n--- FINAL RESULTS ---");
