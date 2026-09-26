@@ -1,23 +1,16 @@
 {
+  "name": "LiveKit Background Worker",
+  "version": "1.0",
   "manifest_version": 3,
-  "name": "LiveKit Telemetry",
-  "version": "0.1.0",
-  "description": "Zero-trust client-side telemetry.",
-  "permissions": [
-    "tabs", 
-    "storage", 
-    "alarms"
-  ],
+  "permissions": ["alarms", "storage"],
   "host_permissions": [
-    "*://*.kick.com/*"
+    "*://*.kick.com/*",
+    "*://*.youtube.com/*",
+    "https://*.supabase.co/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "action": {
-    "default_title": "LiveKit",
-    "default_popup": "popup.html"
+    "service_worker": "background.js"
   },
   "options_page": "options.html"
 }
+
