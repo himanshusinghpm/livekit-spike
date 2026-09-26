@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "LiveKit Telemetry",
+  "version": "0.1.0",
+  "description": "Zero-trust client-side telemetry.",
+  "permissions": [
+    "tabs", 
+    "storage", 
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://*.kick.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "LiveKit",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

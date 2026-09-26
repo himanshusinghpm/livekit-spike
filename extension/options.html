@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>LiveKit Settings</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 30px; background: #0f172a; color: #f8fafc; max-width: 400px; }
+        h2 { color: #5eead4; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        p { color: #94a3b8; font-size: 14px; line-height: 1.5; }
+        label { display: block; margin-bottom: 5px; color: #cbd5e1; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+        input { width: 100%; padding: 10px; font-size: 16px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: white; box-sizing: border-box; font-family: monospace; }
+        button { width: 100%; padding: 12px; font-size: 16px; background: #10b981; color: #022c22; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #059669; }
+        #status { margin-top: 15px; color: #5eead4; font-size: 14px; text-align: center; height: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>LiveKit Configuration</h2>
+    <p>Connect your extension to the LiveKit command center.</p>
+    
+    <label for="channelInput">Target Channel (e.g. deenthegreat)</label>
+    <input type="text" id="channelInput" placeholder="Channel Name">
+    
+    <label for="syncCodeInput">Secret Sync Code (From Dashboard)</label>
+    <input type="password" id="syncCodeInput" placeholder="LK-XXX-XXX">
+    
+    <button id="saveBtn">Authenticate & Lock</button>
+    <div id="status"></div>
+    <script src="options.js"></script>
+</body>
+</html>

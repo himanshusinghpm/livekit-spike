@@ -1,3 +1,36 @@
 node_modules/
-.env
 .DS_Store
+
+# --- secrets: ignore all real env files, keep the examples ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# next.js / build output
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
+
+# supabase local state (contains project refs + pooler connection strings)
+supabase/.temp/
+supabase/.branches/
+
+# certs / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# logs & OS cruft
+*.log
+npm-debug.log*
+yarn-error.log*
+Thumbs.db
+
