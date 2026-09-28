@@ -11,6 +11,13 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*", "*://*.kick.com/*"],
+      "js": ["livekit-scraper.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "options_page": "options.html"
 }
 
