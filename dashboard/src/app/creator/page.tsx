@@ -148,6 +148,9 @@ function MetricCard({ label, value, detail, icon: Icon, live, action }: { label:
 }
 
 export default function CreatorPortal() {
+  const [code, setCode] = useState('');
+  const [connected, setConnected] = useState(false);
+  const connectAgency = () => { if (code) setConnected(true); };
   // ---- preserved backend state & logic ----
   const [sponsorCode, setSponsorCode] = useState('');
   const [creatorId, setCreatorId] = useState('CR-999');

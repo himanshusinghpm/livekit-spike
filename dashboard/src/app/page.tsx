@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
-import { Activity, ArrowUpRight, BarChart3, Check, ChevronRight, CircleDot, Clock, Code2, Download, Gauge, Instagram, Layers3, LayoutDashboard, LogOut, Menu, Play, Radio, ShieldCheck, Sparkles, Users, Youtube } from 'lucide-react';
+import { Activity, ArrowUpRight, BarChart3, Check, ChevronRight, CircleDot, Clock, Code2, Download, Gauge, Layers3, LayoutDashboard, LogOut, Menu, Play, Radio, ShieldCheck, Sparkles, Tv, Users, Video } from 'lucide-react';
 
 const steps = [
   {
