@@ -1,4 +1,4 @@
-console.log("[LiveKit] Pure Text Scraper Active (Bounded Regex).");
+console.log("[LiveKit] Scraper Active (V9 Final - YT Frozen, Kick API Restored).");
 let viewerDataPool = [];
 let activeSessionId = null;
 let activeChannelName = "LiveKit Creator";
@@ -11,11 +11,14 @@ chrome.storage.local.get(['targetKick', 'targetYt'], (res) => {
     if(res.targetYt) lockedYtChannel = res.targetYt.toLowerCase();
 });
 
+let cachedKickViews = 0;
+let lastKickFetch = 0;
+
 async function poolData() {
     let ytViews = 0, kickViews = 0;
 
     // ==========================================
-    // YOUTUBE: BOUNDED TEXT EXTRACT
+    // YOUTUBE: FROZEN LOGIC
     // ==========================================
     if (window.location.hostname.includes('youtube.com')) {
         try {
@@ -37,10 +40,27 @@ async function poolData() {
 
             if (!activeSessionId) activeSessionId = new URLSearchParams(window.location.search).get('v');
             
+            // Time Extraction (FROZEN)
+            if (!streamStartTime) {
+                const metaDate = document.querySelector('meta[itemprop="startDate"], meta[itemprop="datePublished"]');
+                if (metaDate && metaDate.content) {
+                    const parsed = new Date(metaDate.content).getTime();
+                    if (!isNaN(parsed)) streamStartTime = parsed;
+                } else {
+                    const html = document.documentElement.innerHTML;
+                    const timeMatch = html.match(/"(?:startTimestamp|startDate)"\s*:\s*"([^"]+)"/);
+                    if (timeMatch && timeMatch[1]) {
+                        const parsed = new Date(timeMatch[1]).getTime();
+                        if (!isNaN(parsed)) streamStartTime = parsed;
+                    }
+                }
+            }
+
+            // CCV Extraction (FROZEN)
+
             const metadata = document.querySelector('ytd-watch-metadata') || document.querySelector('#primary-inner') || document.body;
             if (metadata) {
                 const text = metadata.textContent || "";
-                // BOUNDED REGEX: Rejects massive JSON strings, only accepts valid 1-10 digit numbers
                 const match = text.match(/(?:[^\d,]|^)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,10})\s+watching/i);
                 if (match && match[1]) {
                     ytViews = parseInt(match[1].replace(/[^0-9]/g, '')) || 0;
@@ -52,28 +72,41 @@ async function poolData() {
     }
 
     // ==========================================
-    // KICK: BOUNDED TEXT EXTRACT
+    // KICK: NATIVE API POLLING (RESTORED)
     // ==========================================
     if (window.location.hostname.includes('kick.com')) {
         try {
             const currentPath = window.location.pathname.toLowerCase();
-            const channelName = currentPath.split('/')[1];
+            const channelName = currentPath.split('/')[1]?.split('?')[0];
             if (lockedKickChannel && channelName !== lockedKickChannel) return;
 
-            activeChannelName = channelName;
-            if (!activeSessionId) activeSessionId = channelName + '_live';
-
-            const mainContent = document.querySelector('#main-content') || document.body;
-            if (mainContent) {
-                const text = mainContent.textContent || "";
-                // BOUNDED REGEX: Rejects massive JSON strings, only accepts valid 1-10 digit numbers
-                const match = text.match(/(?:[^\d,]|^)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,10})\s+watching/i);
-                if (match && match[1]) {
-                    kickViews = parseInt(match[1].replace(/[^0-9]/g, '')) || 0;
+            if (channelName) {
+                activeChannelName = channelName;
+                
+                // Throttle API to 5 seconds to prevent rate limits, while keeping 1s caching for the pool
+                if (Date.now() - lastKickFetch > 5000 || cachedKickViews === 0) {
+                    lastKickFetch = Date.now();
+                    const res = await fetch(`https://kick.com/api/v2/channels/${channelName}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.livestream) {
+                            cachedKickViews = data.livestream.viewer_count || 0;
+                            activeSessionId = data.livestream.id.toString();
+                            if (!streamStartTime && data.livestream.created_at) {
+                                streamStartTime = new Date(data.livestream.created_at).getTime();
+                            }
+                        } else {
+                            cachedKickViews = 0;
+                        }
+                    } else {
+                        cachedKickViews = 0;
+                    }
                 }
             }
+            kickViews = cachedKickViews;
         } catch (e) {
             console.error("[LiveKit] Kick Pool Error:", e);
+            kickViews = cachedKickViews; // Keep caching last known value on transient network errors
         }
     }
 
@@ -81,8 +114,10 @@ async function poolData() {
     // POOL & LOG
     // ==========================================
     if (ytViews > 0 || kickViews > 0) {
+        if (!streamStartTime) streamStartTime = Date.now(); // Failsafe
+        
         viewerDataPool.push({ total: ytViews + kickViews, yt: ytViews, kick: kickViews });
-        const elapsed = streamStartTime ? Math.floor((Date.now() - streamStartTime) / 1000) : 0;
+        const elapsed = Math.floor((Date.now() - streamStartTime) / 1000);
         console.log(`[LiveKit] Pooled -> YT: ${ytViews} | Kick: ${kickViews} | Session: ${activeSessionId} | Elapsed: ${elapsed}s`);
     }
 }
@@ -111,3 +146,4 @@ setInterval(() => {
     });
     viewerDataPool = [];
 }, 60000);
+

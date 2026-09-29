@@ -1,24 +1,34 @@
-function updateUI() {
-    chrome.runtime.sendMessage({ action: "GET_STATS" }, (response) => {
-        if (!response) return;
-        
-        const statusBadge = document.getElementById('statusBadge');
-        if (response.status === "TRACKING") {
-            statusBadge.textContent = "LIVE TRACKING";
-            statusBadge.className = "status-badge status-tracking";
-        } else {
-            statusBadge.textContent = "IDLE (Open a Kick stream)";
-            statusBadge.className = "status-badge status-idle";
-        }
+document.addEventListener('DOMContentLoaded', () => {
+  const syncCodeInput = document.getElementById('syncCode');
+  const targetYtInput = document.getElementById('targetYt');
+  const targetKickInput = document.getElementById('targetKick');
+  const saveBtn = document.getElementById('saveBtn');
+  const statusMsg = document.getElementById('statusMsg');
 
-        document.getElementById('channelName').textContent = response.channel;
-        document.getElementById('currentPeak').textContent = response.peak > 0 ? response.peak : "--";
-        document.getElementById('currentAvg').textContent = response.avg > 0 ? response.avg : "--";
+  // Load existing configuration on open
+  chrome.storage.local.get(['syncCode', 'targetYt', 'targetKick'], (result) => {
+    if (result.syncCode) syncCodeInput.value = result.syncCode;
+    if (result.targetYt) targetYtInput.value = result.targetYt;
+    if (result.targetKick) targetKickInput.value = result.targetKick;
+  });
+
+  // Save configuration and trigger identity lock
+  saveBtn.addEventListener('click', () => {
+    const config = {
+      syncCode: syncCodeInput.value.trim(),
+      targetYt: targetYtInput.value.trim(),
+      targetKick: targetKickInput.value.trim()
+    };
+
+    chrome.storage.local.set(config, () => {
+      // Show success feedback
+      statusMsg.classList.add('visible');
+      saveBtn.textContent = "Saved Successfully";
+
+      setTimeout(() => {
+        statusMsg.classList.remove('visible');
+        saveBtn.textContent = "Lock Configuration";
+      }, 2500);
     });
-}
-
-// Fetch stats immediately when popup opens
-updateUI();
-
-// Refresh the UI every 2 seconds while the popup is open
-setInterval(updateUI, 2000);
+  });
+});

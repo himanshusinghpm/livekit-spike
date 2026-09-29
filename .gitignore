@@ -3,6 +3,7 @@ node_modules/
 
 # --- secrets: ignore all real env files, keep the examples ---
 .env
+.env.local
 .env.*
 !.env.example
 !.env.*.example

@@ -1,49 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <style>
-        body {
-            width: 250px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            padding: 15px;
-            background-color: #0f172a; /* Dark slate background */
-            color: #f8fafc;
-            margin: 0;
-        }
-        h2 { margin-top: 0; font-size: 16px; color: #5eead4; border-bottom: 1px solid #334155; padding-bottom: 8px;}
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-        .label { color: #94a3b8; }
-        .value { font-weight: bold; }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .status-tracking { background-color: #10b981; color: #022c22; }
-        .status-idle { background-color: #64748b; color: #f8fafc; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiveKit Handshake</title>
+  <style>
+    :root {
+      --bg: #0a0b0d;
+      --panel: #111216;
+      --border: rgba(255, 255, 255, 0.07);
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --orange: #f97316;
+      --orange-hover: #fb923c;
+      --success: #34d399;
+    }
+    body {
+      width: 320px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 24px;
+      height: 24px;
+      background: var(--orange);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #000;
+      font-size: 14px;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .container {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input {
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      border-color: var(--orange);
+    }
+    input::placeholder {
+      color: #52525b;
+    }
+    button {
+      background-color: var(--orange);
+      color: #000;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-top: 8px;
+    }
+    button:hover {
+      background-color: var(--orange-hover);
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 12px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .status.visible {
+      opacity: 1;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background-color: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+    }
+  </style>
 </head>
 <body>
-    <h2>LiveKit Telemetry</h2>
-    <div id="statusBadge" class="status-badge status-idle">IDLE</div>
-    
-    <div class="stat-row">
-        <span class="label">Channel:</span>
-        <span id="channelName" class="value">--</span>
+  <div class="header">
+    <div class="logo">L</div>
+    <div class="title">LiveKit Telemetry</div>
+  </div>
+  <div class="container">
+    <div class="input-group">
+      <label for="syncCode">Agency Sync Code</label>
+      <input type="text" id="syncCode" placeholder="e.g. LK-123-ABC" autocomplete="off">
     </div>
-    <div class="stat-row">
-        <span class="label">Current Peak:</span>
-        <span id="currentPeak" class="value">--</span>
+    <div class="input-group">
+      <label for="targetYt">YouTube Handle (Identity Lock)</label>
+      <input type="text" id="targetYt" placeholder="e.g. @CreatorName" autocomplete="off">
     </div>
-    <div class="stat-row">
-        <span class="label">Current Avg:</span>
-        <span id="currentAvg" class="value">--</span>
+    <div class="input-group">
+      <label for="targetKick">Kick Username (Identity Lock)</label>
+      <input type="text" id="targetKick" placeholder="e.g. creatorname" autocomplete="off">
     </div>
-    
-    <script src="popup.js"></script>
+    <button id="saveBtn">Lock Configuration</button>
+    <div class="status" id="statusMsg">
+      <div class="status-dot"></div>
+      <span style="color: var(--success)">Telemetry Link Armed</span>
+    </div>
+  </div>
+  <script src="popup.js"></script>
 </body>
 </html>
