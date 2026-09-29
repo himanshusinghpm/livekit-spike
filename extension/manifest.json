@@ -1,6 +1,7 @@
 {
-  "name": "LiveKit Background Worker",
-  "version": "1.0",
+  "name": "LiveKit Telemetry",
+  "version": "1.0.0",
+  "description": "Zero-friction, real-time cross-platform telemetry layer for creators and agencies.",
   "manifest_version": 3,
   "permissions": ["alarms", "storage"],
   "host_permissions": [
