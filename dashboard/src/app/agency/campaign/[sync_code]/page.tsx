@@ -5,6 +5,7 @@ import { useTelemetry } from '@/hooks/useTelemetry';
 import { Area, ComposedChart, Line, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 import { ArrowLeft, Activity, Users, Clock, Radio, Info, Download } from 'lucide-react';
 import { useMemo } from 'react';
+import SponsorPDFExport from '@/components/SponsorPDFExport';
 
 const CustomTooltip = ({ active, payload, label, isMultiStream }: any) => {
   if (active && payload && payload.length) {
@@ -149,6 +150,13 @@ export default function CampaignTelemetryPage() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          <SponsorPDFExport
+            campaignName={campaignName || syncCode}
+            creatorHandle={data[0]?.channel_name || data[0]?.sync_code || 'creator'}
+            peakCcv={peakViewers}
+            avgCcv={avgViewers}
+            duration={formatDuration(durationSeconds)}
+          />
           <button onClick={handleExportCSV} className="flex items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.06]">
             <Download className="size-3" /> EXPORT CSV
           </button>
