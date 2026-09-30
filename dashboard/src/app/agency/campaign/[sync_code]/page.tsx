@@ -152,10 +152,20 @@ export default function CampaignTelemetryPage() {
         <div className="flex items-center gap-3">
           <SponsorPDFExport
             campaignName={campaignName || syncCode}
-            creatorHandle={data[0]?.channel_name || data[0]?.sync_code || 'creator'}
+            campaignId={syncCode}
+            brandName={campaignName || 'Brand'}
+            platformHandles={{
+              kick: hasKick ? (data.find(r => r.platform === 'kick')?.channel_name || data[0]?.channel_name) : undefined,
+              youtube: hasYouTube ? (data.find(r => r.platform === 'youtube')?.channel_name || data[0]?.channel_name) : undefined,
+            }}
             peakCcv={peakViewers}
             avgCcv={avgViewers}
             duration={formatDuration(durationSeconds)}
+            durationSeconds={durationSeconds}
+            chartData={chartData}
+            hasYouTube={hasYouTube}
+            hasKick={hasKick}
+            isMultiStream={isMultiStream}
             onExportCSV={handleExportCSV}
           />
           <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-medium text-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.1)]">

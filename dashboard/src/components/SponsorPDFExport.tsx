@@ -3,17 +3,40 @@ import { useEffect, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import { ChevronDown, FileText, Table } from 'lucide-react';
+import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts';
+export interface PdfChartPoint {
+  time: string;
+  youtube: number;
+  kick: number;
+  total: number;
+}
 interface SponsorPDFExportProps {
   campaignName: string;
-  creatorHandle: string;
+  campaignId?: string;
+  brandName?: string;
+  platformHandles?: { kick?: string; youtube?: string };
+  creatorHandle?: string;
   peakCcv: number;
   avgCcv: number;
   duration: string;
+  durationSeconds?: number;
+  chartData?: PdfChartPoint[];
+  hasYouTube?: boolean;
+  hasKick?: boolean;
+  isMultiStream?: boolean;
   onExportCSV?: () => void;
 }
 export default function SponsorPDFExport({
-  campaignName, creatorHandle, peakCcv, avgCcv, duration, onExportCSV,
+  campaignName, campaignId, brandName = 'Brand', platformHandles, creatorHandle,
+  peakCcv, avgCcv, duration, durationSeconds, chartData = [], hasYouTube = true, hasKick = false, isMultiStream = false, onExportCSV,
 }: SponsorPDFExportProps) {
+  const handles = platformHandles ?? (creatorHandle ? { kick: creatorHandle } : {});
+  const platformLine = [handles.kick ? `Kick (@${handles.kick})` : null, handles.youtube ? `YouTube (@${handles.youtube})` : null]
+    .filter(Boolean).join(' | ') || 'No platform linked';
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  const fileName = `${slug(brandName || 'brand')}-${slug(campaignName || 'campaign')}-report.pdf`;
+  const totalHoursWatched = durationSeconds != null ? Math.round(avgCcv * (durationSeconds / 3600)) : null;
+  const fmtCompact = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
   const templateRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -51,7 +74,7 @@ export default function SponsorPDFExport({
       const renderWidth = (dims.w * renderHeight) / dims.h;
       const xOffset = (pdfWidth - renderWidth) / 2;
       pdf.addImage(dataUrl, 'PNG', xOffset, 0, renderWidth, renderHeight);
-      pdf.save('livekit-sponsor-report.pdf');
+      pdf.save(fileName);
     } catch (err) {
       console.error('Sponsor PDF export failed:', err);
     } finally {
@@ -111,38 +134,61 @@ export default function SponsorPDFExport({
             borderColor: '#ffffff', outlineColor: '#ffffff',
           }}
         >
-          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: '#6b7280', margin: 0 }}>LIVEKIT SPONSOR REPORT</p>
-          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>Sponsor Campaign Report</h1>
-          <p style={{ fontSize: 14, color: '#4b5563', margin: '8px 0 0 0' }}>{campaignName} | @{creatorHandle} | {generatedDate}</p>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: '#6b7280', margin: 0 }}>{(brandName || 'Brand').toUpperCase()} SPONSOR REPORT</p>
+          <h1 style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{brandName} Campaign Performance Report</h1>
+          <p style={{ fontSize: 14, color: '#4b5563', margin: '8px 0 0 0' }}>{campaignName} | {generatedDate}</p>
+          <p style={{ fontSize: 13, color: '#111827', margin: '6px 0 0 0' }}>Platforms: {platformLine}</p>
           <div style={{
-            marginTop: 24, display: 'flex', alignItems: 'center', gap: 8,
-            borderRadius: 8, border: '1px solid #86efac', backgroundColor: '#dcfce7',
-            padding: '12px 16px', fontSize: 14, fontWeight: 700, color: '#166534',
+            marginTop: 24, borderRadius: 10, border: '2px solid #15803d', backgroundColor: '#f0fdf4',
+            padding: '14px 18px',
           }}>
-            <span>LiveKit Verified: Generated from live campaign telemetry</span>
+            <p style={{ fontSize: 15, fontWeight: 800, color: '#14532d', margin: 0 }}>🛡️ LiveKit Verified: Agency Sync-Code Authenticated</p>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#166534', margin: '6px 0 0 0' }}>Sync Code: {campaignId || campaignName} | Telemetry Interval: 60s</p>
           </div>
           <div style={{ marginTop: 32, display: 'flex', gap: 16 }}>
             <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>PEAK REACH</p>
-              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{peakCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{peakCcv.toLocaleString()}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Peak CCV</p>
             </div>
             <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>AVG SUSTAINED CCV</p>
-              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{avgCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{avgCcv.toLocaleString()}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Average CCV</p>
             </div>
             <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>TOTAL DURATION</p>
-              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{duration}</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{duration}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Stream length</p>
+            </div>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>TOTAL HOURS WATCHED</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{totalHoursWatched != null ? fmtCompact(totalHoursWatched) : '—'}</p>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>{totalHoursWatched != null ? `${totalHoursWatched.toLocaleString()} hrs` : 'Awaiting data'}</p>
             </div>
           </div>
           <div style={{ marginTop: 32, display: 'flex', gap: 16, fontSize: 14, color: '#000000' }}>
             <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>CAMPAIGN</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>{campaignName}</p></div>
-            <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>CREATOR</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>@{creatorHandle}</p></div>
+            <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>PLATFORMS</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>{platformLine}</p></div>
           </div>
-          <p style={{ marginTop: 32, fontSize: 11, color: '#9ca3af' }}>Generated by LiveKit Dashboard | {generatedDate} | livekit-sponsor-report.pdf</p>
+          <div style={{ marginTop: 24 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>AUDIENCE RETENTION (CCV)</p>
+            <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#ffffff', padding: 12 }}>
+              {chartData.length > 0 ? (
+                <ComposedChart width={704} height={260} data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis dataKey="time" stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} minTickGap={40} />
+                  <YAxis stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val: number) => (val >= 1000 ? `${(val / 1000).toFixed(1)}k` : `${val}`)} />
+                  {hasYouTube && <Area type="monotone" dataKey="youtube" name="YouTube" stroke="#f43f5e" strokeWidth={2} fill="#f43f5e" fillOpacity={0.15} isAnimationActive={false} />}
+                  {hasKick && <Area type="monotone" dataKey="kick" name="Kick" stroke="#16a34a" strokeWidth={2} fill="#16a34a" fillOpacity={0.15} isAnimationActive={false} />}
+                  {isMultiStream && <Line type="monotone" dataKey="total" name="Combined" stroke="#7c3aed" strokeWidth={2} dot={false} isAnimationActive={false} />}
+                </ComposedChart>
+              ) : (
+                <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Awaiting telemetry...</p>
+              )}
+            </div>
+          </div>
+          <p style={{ marginTop: 32, fontSize: 11, color: '#9ca3af' }}>Generated by LiveKit Dashboard | {generatedDate} | {fileName}</p>
         </div>
       </div>
     </>
