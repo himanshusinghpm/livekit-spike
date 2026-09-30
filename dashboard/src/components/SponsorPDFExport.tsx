@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import { ChevronDown, FileText, Table } from 'lucide-react';
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts';
 export interface PdfChartPoint {
@@ -79,7 +79,7 @@ export default function SponsorPDFExport({
     setOpen(false);
     setIsGenerating(true);
     try {
-      const dataUrl = await toPng(templateRef.current, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff' });
+      const dataUrl = await toJpeg(templateRef.current, { quality: 0.75, pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
       const img = new Image();
       const dims: { w: number; h: number } = await new Promise((resolve, reject) => {
         img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -93,7 +93,7 @@ export default function SponsorPDFExport({
       const renderHeight = Math.min(pdfHeight, pageHeight);
       const renderWidth = (dims.w * renderHeight) / dims.h;
       const xOffset = (pdfWidth - renderWidth) / 2;
-      pdf.addImage(dataUrl, 'PNG', xOffset, 0, renderWidth, renderHeight);
+      pdf.addImage(dataUrl, 'JPEG', xOffset, 0, renderWidth, renderHeight);
       pdf.save(fileName);
     } catch (err) {
       console.error('Sponsor PDF export failed:', err);
