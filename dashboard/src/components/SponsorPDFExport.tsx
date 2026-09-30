@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { ChevronDown, FileText, Table } from 'lucide-react';
 interface SponsorPDFExportProps {
   campaignName: string;
@@ -36,18 +36,21 @@ export default function SponsorPDFExport({
     setOpen(false);
     setIsGenerating(true);
     try {
-      const canvas = await html2canvas(templateRef.current, {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      const dataUrl = await toPng(templateRef.current, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff' });
+      const img = new Image();
+      const dims: { w: number; h: number } = await new Promise((resolve, reject) => {
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = reject;
+        img.src = dataUrl;
       });
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = (dims.h * pdfWidth) / dims.w;
       const pageHeight = pdf.internal.pageSize.getHeight();
       const renderHeight = Math.min(pdfHeight, pageHeight);
-      const renderWidth = (canvas.width * renderHeight) / canvas.height;
+      const renderWidth = (dims.w * renderHeight) / dims.h;
       const xOffset = (pdfWidth - renderWidth) / 2;
-      pdf.addImage(imgData, 'PNG', xOffset, 0, renderWidth, renderHeight);
+      pdf.addImage(dataUrl, 'PNG', xOffset, 0, renderWidth, renderHeight);
       pdf.save('livekit-sponsor-report.pdf');
     } catch (err) {
       console.error('Sponsor PDF export failed:', err);
