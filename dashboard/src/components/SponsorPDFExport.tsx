@@ -1,22 +1,39 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Download, ShieldCheck } from 'lucide-react';
+import { ChevronDown, FileText, Table } from 'lucide-react';
 interface SponsorPDFExportProps {
   campaignName: string;
   creatorHandle: string;
   peakCcv: number;
   avgCcv: number;
   duration: string;
+  onExportCSV?: () => void;
 }
 export default function SponsorPDFExport({
-  campaignName, creatorHandle, peakCcv, avgCcv, duration,
+  campaignName, creatorHandle, peakCcv, avgCcv, duration, onExportCSV,
 }: SponsorPDFExportProps) {
   const templateRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const handleDownload = async () => {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const handleDownloadPDF = async () => {
     if (!templateRef.current || isGenerating) return;
+    setOpen(false);
     setIsGenerating(true);
     try {
       const canvas = await html2canvas(templateRef.current, {
@@ -38,50 +55,91 @@ export default function SponsorPDFExport({
       setIsGenerating(false);
     }
   };
+  const handleCSV = () => { setOpen(false); onExportCSV?.(); };
   const generatedDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
   return (
     <>
-      <button
-        onClick={handleDownload}
-        disabled={isGenerating}
-        className="flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-semibold text-black shadow-[0_0_15px_rgba(249,115,22,0.35)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <Download className="size-3.5" />
-        {isGenerating ? 'GENERATING PDF...' : 'Download Sponsor PDF'}
-      </button>
-      <div className="absolute left-[-9999px] top-0">
-        <div ref={templateRef} className="w-[800px] bg-white p-10 text-black">
-          <p className="text-xs font-semibold tracking-[0.2em] text-gray-500">LIVEKIT SPONSOR REPORT</p>
-          <h1 className="mt-2 text-3xl font-extrabold text-black">Sponsor Campaign Report</h1>
-          <p className="mt-2 text-sm text-gray-600">{campaignName} | @{creatorHandle} | {generatedDate}</p>
-          <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-300 bg-green-100 px-4 py-3 text-sm font-semibold text-green-800">
-            <ShieldCheck className="size-5" />
+      <div ref={menuRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          disabled={isGenerating}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="flex items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isGenerating ? 'GENERATING PDF...' : 'Export Report'}
+          <ChevronDown className="size-3" />
+        </button>
+        {open && (
+          <div
+            role="menu"
+            className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-white/[0.09] bg-[#111216] shadow-2xl"
+          >
+            <button
+              role="menuitem"
+              onClick={handleDownloadPDF}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-[12px] text-zinc-200 transition hover:bg-white/[0.06]"
+            >
+              <FileText className="size-4 text-orange-400" />
+              <span><span className="block font-semibold">Download PDF</span><span className="block text-[11px] text-zinc-500">For Sponsors</span></span>
+              <span className="ml-auto">📄</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={handleCSV}
+              className="flex w-full items-center gap-3 border-t border-white/[0.06] px-4 py-3 text-left text-[12px] text-zinc-200 transition hover:bg-white/[0.06]"
+            >
+              <Table className="size-4 text-indigo-400" />
+              <span><span className="block font-semibold">Download Raw CSV</span><span className="block text-[11px] text-zinc-500">Raw telemetry</span></span>
+              <span className="ml-auto">📊</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ position: 'absolute', left: -9999, top: 0 }}>
+        <div
+          ref={templateRef}
+          style={{
+            width: 800, padding: 40, backgroundColor: '#ffffff', color: '#000000',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            borderColor: '#ffffff', outlineColor: '#ffffff',
+          }}
+        >
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: '#6b7280', margin: 0 }}>LIVEKIT SPONSOR REPORT</p>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>Sponsor Campaign Report</h1>
+          <p style={{ fontSize: 14, color: '#4b5563', margin: '8px 0 0 0' }}>{campaignName} | @{creatorHandle} | {generatedDate}</p>
+          <div style={{
+            marginTop: 24, display: 'flex', alignItems: 'center', gap: 8,
+            borderRadius: 8, border: '1px solid #86efac', backgroundColor: '#dcfce7',
+            padding: '12px 16px', fontSize: 14, fontWeight: 700, color: '#166534',
+          }}>
             <span>LiveKit Verified: Generated from live campaign telemetry</span>
           </div>
-          <div className="mt-8 grid grid-cols-3 gap-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
-              <p className="text-[11px] font-bold tracking-wider text-gray-500">PEAK REACH</p>
-              <p className="mt-2 text-3xl font-extrabold text-black">{peakCcv.toLocaleString()}</p>
-              <p className="mt-1 text-xs text-gray-500">Peak CCV</p>
+          <div style={{ marginTop: 32, display: 'flex', gap: 16 }}>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>PEAK REACH</p>
+              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{peakCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Peak CCV</p>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
-              <p className="text-[11px] font-bold tracking-wider text-gray-500">AVG SUSTAINED CCV</p>
-              <p className="mt-2 text-3xl font-extrabold text-black">{avgCcv.toLocaleString()}</p>
-              <p className="mt-1 text-xs text-gray-500">Average CCV</p>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>AVG SUSTAINED CCV</p>
+              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{avgCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Average CCV</p>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
-              <p className="text-[11px] font-bold tracking-wider text-gray-500">TOTAL DURATION</p>
-              <p className="mt-2 text-3xl font-extrabold text-black">{duration}</p>
-              <p className="mt-1 text-xs text-gray-500">Stream length</p>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>TOTAL DURATION</p>
+              <p style={{ fontSize: 30, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{duration}</p>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Stream length</p>
             </div>
           </div>
-          <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-black">
-            <div><p className="text-xs font-bold text-gray-500">CAMPAIGN</p><p className="mt-1 font-semibold">{campaignName}</p></div>
-            <div><p className="text-xs font-bold text-gray-500">CREATOR</p><p className="mt-1 font-semibold">@{creatorHandle}</p></div>
+          <div style={{ marginTop: 32, display: 'flex', gap: 16, fontSize: 14, color: '#000000' }}>
+            <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>CAMPAIGN</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>{campaignName}</p></div>
+            <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>CREATOR</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>@{creatorHandle}</p></div>
           </div>
-          <p className="mt-8 text-[11px] text-gray-400">Generated by LiveKit Dashboard | {generatedDate} | livekit-sponsor-report.pdf</p>
+          <p style={{ marginTop: 32, fontSize: 11, color: '#9ca3af' }}>Generated by LiveKit Dashboard | {generatedDate} | livekit-sponsor-report.pdf</p>
         </div>
       </div>
     </>

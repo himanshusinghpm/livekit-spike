@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import { Area, ComposedChart, Line, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
-import { ArrowLeft, Activity, Users, Clock, Radio, Info, Download } from 'lucide-react';
+import { ArrowLeft, Activity, Users, Clock, Radio, Info } from 'lucide-react';
 import { useMemo } from 'react';
 import SponsorPDFExport from '@/components/SponsorPDFExport';
 
@@ -156,10 +156,8 @@ export default function CampaignTelemetryPage() {
             peakCcv={peakViewers}
             avgCcv={avgViewers}
             duration={formatDuration(durationSeconds)}
+            onExportCSV={handleExportCSV}
           />
-          <button onClick={handleExportCSV} className="flex items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:bg-white/[0.06]">
-            <Download className="size-3" /> EXPORT CSV
-          </button>
           <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-medium text-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
             <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> RECEIVING SIGNAL
           </div>
