@@ -280,7 +280,7 @@ export default function Dashboard() {
       <footer className="border-t border-white/[0.07]">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 text-xs text-white/30 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <Link href="/" aria-label="LiveKit home"><BrandMark /></Link>
-          <div className="flex items-center gap-5"><a href="#privacy" className="transition-colors hover:text-white/70">Privacy Policy</a><a href="#terms" className="transition-colors hover:text-white/70">Terms of Service</a><span>© 2025 LiveKit, Inc.</span></div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2"><Link href="/terms" className="transition-colors hover:text-white/70">Terms of Service</Link><Link href="/privacy" className="transition-colors hover:text-white/70">Privacy Policy</Link><Link href="/refunds" className="transition-colors hover:text-white/70">Refund Policy</Link><a href="mailto:support.livekit@gmail.com" className="transition-colors hover:text-white/70">support.livekit@gmail.com</a><span>© 2025 LiveKit, Inc.</span></div>
         </div>
       </footer>
           
