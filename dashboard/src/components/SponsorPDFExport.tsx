@@ -10,6 +10,10 @@ export interface PdfChartPoint {
   kick: number;
   total: number;
 }
+export interface PlatformStats {
+  peak: number;
+  avg: number;
+}
 interface SponsorPDFExportProps {
   campaignName: string;
   campaignId?: string;
@@ -18,6 +22,9 @@ interface SponsorPDFExportProps {
   creatorHandle?: string;
   peakCcv: number;
   avgCcv: number;
+  kickStats?: PlatformStats;
+  youtubeStats?: PlatformStats;
+  combinedStats?: PlatformStats;
   duration: string;
   durationSeconds?: number;
   chartData?: PdfChartPoint[];
@@ -28,14 +35,27 @@ interface SponsorPDFExportProps {
 }
 export default function SponsorPDFExport({
   campaignName, campaignId, brandName = 'Brand', platformHandles, creatorHandle,
-  peakCcv, avgCcv, duration, durationSeconds, chartData = [], hasYouTube = true, hasKick = false, isMultiStream = false, onExportCSV,
+  peakCcv, avgCcv, kickStats, youtubeStats, combinedStats,
+  duration, durationSeconds, chartData = [], hasYouTube = true, hasKick = false, isMultiStream = false, onExportCSV,
 }: SponsorPDFExportProps) {
   const handles = platformHandles ?? (creatorHandle ? { kick: creatorHandle } : {});
   const platformLine = [handles.kick ? `Kick (@${handles.kick})` : null, handles.youtube ? `YouTube (@${handles.youtube})` : null]
     .filter(Boolean).join(' | ') || 'No platform linked';
-  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  const fileName = `${slug(brandName || 'brand')}-${slug(campaignName || 'campaign')}-report.pdf`;
-  const totalHoursWatched = durationSeconds != null ? Math.round(avgCcv * (durationSeconds / 3600)) : null;
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  const brandSlug = slug(brandName || 'campaign');
+  const campaignSlug = slug(campaignName || '');
+  const baseSlug = campaignSlug.startsWith(brandSlug) && brandSlug.length > 0
+    ? campaignSlug
+    : (campaignSlug && campaignSlug !== brandSlug ? `${brandSlug}-${campaignSlug}` : (campaignSlug || brandSlug || 'campaign'));
+  const fileName = `${baseSlug || 'campaign'}-report.pdf`;
+  const resolvedCombined: PlatformStats = combinedStats ?? { peak: peakCcv, avg: avgCcv };
+  const showBreakdown = isMultiStream && hasYouTube && hasKick;
+  const effectiveKick: PlatformStats | undefined = kickStats ?? (hasKick ? { peak: peakCcv, avg: avgCcv } : undefined);
+  const effectiveYoutube: PlatformStats | undefined = youtubeStats ?? (hasYouTube ? { peak: peakCcv, avg: avgCcv } : undefined);
+  const singleLabel = hasKick ? 'KICK' : hasYouTube ? 'YOUTUBE' : 'COMBINED';
+  const singleStats: PlatformStats = hasKick && effectiveKick ? effectiveKick : hasYouTube && effectiveYoutube ? effectiveYoutube : resolvedCombined;
+  const hoursAvg = showBreakdown ? resolvedCombined.avg : singleStats.avg;
+  const totalHoursWatched = durationSeconds != null ? Math.round(hoursAvg * (durationSeconds / 3600)) : null;
   const fmtCompact = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
   const templateRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -145,28 +165,50 @@ export default function SponsorPDFExport({
             <p style={{ fontSize: 15, fontWeight: 800, color: '#14532d', margin: 0 }}>🛡️ LiveKit Verified: Agency Sync-Code Authenticated</p>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#166534', margin: '6px 0 0 0' }}>Sync Code: {campaignId || campaignName} | Telemetry Interval: 60s</p>
           </div>
-          <div style={{ marginTop: 32, display: 'flex', gap: 16 }}>
-            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: '32px 0 0 0' }}>{showBreakdown ? 'COMBINED TOTALS' : `${singleLabel} PERFORMANCE`}</p>
+          <div style={{ marginTop: 12, display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 16 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>PEAK REACH</p>
-              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{peakCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 26, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{(showBreakdown ? resolvedCombined.peak : singleStats.peak).toLocaleString()}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Peak CCV</p>
             </div>
-            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 16 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>AVG SUSTAINED CCV</p>
-              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{avgCcv.toLocaleString()}</p>
+              <p style={{ fontSize: 26, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{(showBreakdown ? resolvedCombined.avg : singleStats.avg).toLocaleString()}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Average CCV</p>
             </div>
-            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 16 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>TOTAL DURATION</p>
-              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{duration}</p>
+              <p style={{ fontSize: 26, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{duration}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>Stream length</p>
             </div>
-            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 20 }}>
+            <div style={{ flex: 1, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', padding: 16 }}>
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>TOTAL HOURS WATCHED</p>
-              <p style={{ fontSize: 28, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{totalHoursWatched != null ? fmtCompact(totalHoursWatched) : '—'}</p>
+              <p style={{ fontSize: 26, fontWeight: 800, color: '#000000', margin: '8px 0 0 0' }}>{totalHoursWatched != null ? fmtCompact(totalHoursWatched) : '—'}</p>
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>{totalHoursWatched != null ? `${totalHoursWatched.toLocaleString()} hrs` : 'Awaiting data'}</p>
             </div>
           </div>
+          {showBreakdown && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: '#6b7280', margin: 0 }}>PLATFORM BREAKDOWN</p>
+              <div style={{ marginTop: 12, display: 'flex', gap: 12 }}>
+                {effectiveKick && (
+                  <div style={{ flex: 1, borderRadius: 8, border: '1px solid #bbf7d0', backgroundColor: '#f0fdf4', padding: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: '#15803d', margin: 0 }}>KICK{handles.kick ? ` (@${handles.kick})` : ''}</p>
+                    <p style={{ fontSize: 13, color: '#000000', margin: '8px 0 0 0' }}>Peak CCV: <span style={{ fontWeight: 800 }}>{effectiveKick.peak.toLocaleString()}</span></p>
+                    <p style={{ fontSize: 13, color: '#000000', margin: '4px 0 0 0' }}>Avg CCV: <span style={{ fontWeight: 800 }}>{effectiveKick.avg.toLocaleString()}</span></p>
+                  </div>
+                )}
+                {effectiveYoutube && (
+                  <div style={{ flex: 1, borderRadius: 8, border: '1px solid #fecdd3', backgroundColor: '#fff1f2', padding: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: '#be123c', margin: 0 }}>YOUTUBE{handles.youtube ? ` (@${handles.youtube})` : ''}</p>
+                    <p style={{ fontSize: 13, color: '#000000', margin: '8px 0 0 0' }}>Peak CCV: <span style={{ fontWeight: 800 }}>{effectiveYoutube.peak.toLocaleString()}</span></p>
+                    <p style={{ fontSize: 13, color: '#000000', margin: '4px 0 0 0' }}>Avg CCV: <span style={{ fontWeight: 800 }}>{effectiveYoutube.avg.toLocaleString()}</span></p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div style={{ marginTop: 32, display: 'flex', gap: 16, fontSize: 14, color: '#000000' }}>
             <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>CAMPAIGN</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>{campaignName}</p></div>
             <div style={{ flex: 1 }}><p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>PLATFORMS</p><p style={{ fontWeight: 600, margin: '4px 0 0 0' }}>{platformLine}</p></div>

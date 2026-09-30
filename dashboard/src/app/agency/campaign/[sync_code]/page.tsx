@@ -84,6 +84,11 @@ export default function CampaignTelemetryPage() {
 
   const peakViewers = chartData.length > 0 ? Math.max(...chartData.map(d => d.total)) : 0;
   const avgViewers = chartData.length > 0 ? Math.round(chartData.reduce((acc, curr) => acc + curr.total, 0) / chartData.length) : 0;
+  const peakOf = (key: 'youtube' | 'kick' | 'total') => chartData.length > 0 ? Math.max(...chartData.map(d => d[key] || 0)) : 0;
+  const avgOf = (key: 'youtube' | 'kick' | 'total') => chartData.length > 0 ? Math.round(chartData.reduce((acc, curr) => acc + (curr[key] || 0), 0) / chartData.length) : 0;
+  const kickStats = hasKick ? { peak: peakOf('kick'), avg: avgOf('kick') } : undefined;
+  const youtubeStats = hasYouTube ? { peak: peakOf('youtube'), avg: avgOf('youtube') } : undefined;
+  const combinedStats = { peak: peakViewers, avg: avgViewers };
 
   // Max duration across all incoming platform streams
   const durationSeconds = data.length > 0 ? Math.max(...data.map(d => d.stream_time_seconds || 0)) : 0;
@@ -153,13 +158,15 @@ export default function CampaignTelemetryPage() {
           <SponsorPDFExport
             campaignName={campaignName || syncCode}
             campaignId={syncCode}
-            brandName={campaignName || 'Brand'}
             platformHandles={{
               kick: hasKick ? (data.find(r => r.platform === 'kick')?.channel_name || data[0]?.channel_name) : undefined,
               youtube: hasYouTube ? (data.find(r => r.platform === 'youtube')?.channel_name || data[0]?.channel_name) : undefined,
             }}
             peakCcv={peakViewers}
             avgCcv={avgViewers}
+            kickStats={kickStats}
+            youtubeStats={youtubeStats}
+            combinedStats={combinedStats}
             duration={formatDuration(durationSeconds)}
             durationSeconds={durationSeconds}
             chartData={chartData}
