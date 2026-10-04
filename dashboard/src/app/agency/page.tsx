@@ -13,7 +13,6 @@ function TableCell({ children, className = '' }: { children: React.ReactNode; cl
   return <td className={`px-5 py-4 ${className}`}>{children}</td>;
 }
 
-// Cleaned up navigation (Removed Campaigns & Creator Roster for leaner V1 UX)
 const navItems = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Settings', icon: Settings },
@@ -25,7 +24,6 @@ function Avatar({ name, tone = 'orange' }: { name?: string; tone?: 'orange' | 'p
   return <span className={`inline-flex size-8 items-center justify-center rounded-full text-xs font-semibold ${tones[tone]}`}>{initials.substring(0, 2).toUpperCase()}</span>;
 }
 
-// Zero State Component
 function EmptyCampaignState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-zinc-800 rounded-lg bg-zinc-950/30 w-full">
@@ -53,6 +51,7 @@ export default function AgencyHub() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [agencyName, setAgencyName] = useState<string>('Agency');
+  const [userEmail, setUserEmail] = useState<string>('');
 
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -62,12 +61,10 @@ export default function AgencyHub() {
   const [campaignName, setCampaignName] = useState('');
   const [creator, setCreator] = useState('');
 
-  // Macro-Stats State
   const [activeCampaignsCount, setActiveCampaignsCount] = useState(0);
   const [globalLiveCcv, setGlobalLiveCcv] = useState(0);
   const [allTimePeak, setAllTimePeak] = useState(0);
 
-  // Auth & User Profile Fetch
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -75,8 +72,8 @@ export default function AgencyHub() {
         router.push('/login');
       } else {
         setAgencyId(session.user.id);
+        setUserEmail(session.user.email || '');
         
-        // Fetch the real agency name from the leads table
         const { data: agencyData } = await supabase
           .from('leads')
           .select('agency_name')
@@ -93,12 +90,10 @@ export default function AgencyHub() {
     checkAuth();
   }, [router]);
 
-  // Load actual campaigns from Supabase securely scoped to this agency
   useEffect(() => {
-    if (!agencyId) return; // Wait for auth to resolve
+    if (!agencyId) return;
 
     async function fetchDashboardData() {
-      // 1. Fetch campaigns exclusively for this agency
       const { data: camps } = await supabase
         .from('campaigns')
         .select('*')
@@ -107,7 +102,6 @@ export default function AgencyHub() {
         
       if (camps) setCampaigns(camps);
 
-      // If the agency has no campaigns, default metrics to 0 and stop fetching
       if (!camps || camps.length === 0) {
         setAllTimePeak(0);
         setActiveCampaignsCount(0);
@@ -117,7 +111,6 @@ export default function AgencyHub() {
 
       const syncCodes = camps.map(c => c.sync_code);
 
-      // 2. Fetch All-Time Peak CCV (Strictly filtered by this agency's Sync Codes)
       const { data: peakData } = await supabase
         .from('stream_intervals')
         .select('interval_peak')
@@ -131,7 +124,6 @@ export default function AgencyHub() {
         setAllTimePeak(0);
       }
 
-      // 3. Fetch Active CCV (Strictly filtered by this agency's Sync Codes)
       const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const { data: liveData } = await supabase.from('stream_intervals')
         .select('sync_code, platform, interval_peak')
@@ -142,7 +134,6 @@ export default function AgencyHub() {
         const activeCodes = new Set(liveData.map(r => r.sync_code));
         setActiveCampaignsCount(activeCodes.size);
 
-        // Aggregate the highest recent ping per active stream
         const latestMap = new Map();
         liveData.forEach(row => {
             const key = `${row.sync_code}-${row.platform}`;
@@ -168,7 +159,6 @@ export default function AgencyHub() {
     setIsGenerating(true);
     const newCode = `LK-${Math.floor(Math.random() * 900 + 100)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     
-    // Write directly to Supabase
     const { data, error } = await supabase
       .from('campaigns')
       .insert([{ 
@@ -246,98 +236,159 @@ export default function AgencyHub() {
             <span className="hidden items-center gap-2 text-xs text-zinc-500 sm:flex">
               <span className="size-1.5 rounded-full bg-emerald-400" />All systems operational
             </span>
-            <button onClick={() => setShowModal(true)} className="flex items-center gap-2 rounded-lg bg-orange-500 px-3.5 py-2 text-xs font-semibold text-black shadow-lg shadow-orange-500/10 transition hover:bg-orange-400">
-              <Plus className="size-4" />Create Campaign
-            </button>
+            {activeNav === 'Overview' && (
+              <button onClick={() => setShowModal(true)} className="flex items-center gap-2 rounded-lg bg-orange-500 px-3.5 py-2 text-xs font-semibold text-black shadow-lg shadow-orange-500/10 transition hover:bg-orange-400">
+                <Plus className="size-4" />Create Campaign
+              </button>
+            )}
           </div>
         </header>
         
         <main className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-          <div className="mb-8 flex items-end justify-between">
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-orange-400">Overview</p>
-              <h2 className="text-2xl font-semibold tracking-tight">Your campaigns at a glance</h2>
-              <p className="mt-1 text-sm text-zinc-500">Monitor live creator activity and provision new campaigns.</p>
-            </div>
-            <button className="hidden items-center gap-2 text-xs text-zinc-500 hover:text-zinc-200 sm:flex">
-              <Activity className="size-4" />Last 30 days <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-          
-          <section aria-label="Campaign metrics" className="grid gap-4 md:grid-cols-3">
-            {[
-              { label: 'Active Streams Right Now', value: String(activeCampaignsCount).padStart(2, '0'), change: 'Transmitting telemetry', icon: Radio, accent: true },
-              { label: 'Global Concurrent Viewers', value: globalLiveCcv.toLocaleString(), change: 'Across all active campaigns', icon: Users },
-              { label: 'All-Time Peak CCV', value: allTimePeak.toLocaleString(), change: 'Highest simultaneous audience reached', icon: Gauge }
-            ].map(({ label, value, change, icon: Icon, accent }) => (
-              <div key={label} className="rounded-xl border border-white/[0.07] bg-[#111216] p-5 shadow-lg">
-                <div className="flex items-start justify-between">
-                  <p className="text-sm text-zinc-500">{label}</p>
-                  <Icon className={`size-[18px] ${accent ? 'text-orange-400' : 'text-zinc-600'}`} />
+          {activeNav === 'Overview' ? (
+            <>
+              <div className="mb-8 flex items-end justify-between">
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-orange-400">Overview</p>
+                  <h2 className="text-2xl font-semibold tracking-tight">Your campaigns at a glance</h2>
+                  <p className="mt-1 text-sm text-zinc-500">Monitor live creator activity and provision new campaigns.</p>
                 </div>
-                <p className="mt-5 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
-                <p className={`mt-2 text-xs ${accent ? 'text-orange-400' : 'text-zinc-600'}`}>{change}</p>
+                <button className="hidden items-center gap-2 text-xs text-zinc-500 hover:text-zinc-200 sm:flex">
+                  <Activity className="size-4" />Last 30 days <ChevronDown className="size-3.5" />
+                </button>
               </div>
-            ))}
-          </section>
+              
+              <section aria-label="Campaign metrics" className="grid gap-4 md:grid-cols-3">
+                {[
+                  { label: 'Active Streams Right Now', value: String(activeCampaignsCount).padStart(2, '0'), change: 'Transmitting telemetry', icon: Radio, accent: true },
+                  { label: 'Global Concurrent Viewers', value: globalLiveCcv.toLocaleString(), change: 'Across all active campaigns', icon: Users },
+                  { label: 'All-Time Peak CCV', value: allTimePeak.toLocaleString(), change: 'Highest simultaneous audience reached', icon: Gauge }
+                ].map(({ label, value, change, icon: Icon, accent }) => (
+                  <div key={label} className="rounded-xl border border-white/[0.07] bg-[#111216] p-5 shadow-lg">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm text-zinc-500">{label}</p>
+                      <Icon className={`size-[18px] ${accent ? 'text-orange-400' : 'text-zinc-600'}`} />
+                    </div>
+                    <p className="mt-5 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+                    <p className={`mt-2 text-xs ${accent ? 'text-orange-400' : 'text-zinc-600'}`}>{change}</p>
+                  </div>
+                ))}
+              </section>
 
-          <section className="mt-8 rounded-xl border border-white/[0.07] bg-[#111216] shadow-lg">
-            <div className="flex flex-col gap-3 border-b border-white/[0.07] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Campaign Ledger</h3>
-                <p className="mt-1 text-xs text-zinc-600">Your provisioned campaigns and sync codes.</p>
+              <section className="mt-8 rounded-xl border border-white/[0.07] bg-[#111216] shadow-lg">
+                <div className="flex flex-col gap-3 border-b border-white/[0.07] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">Campaign Ledger</h3>
+                    <p className="mt-1 text-xs text-zinc-600">Your provisioned campaigns and sync codes.</p>
+                  </div>
+                </div>
+                
+                {campaigns.length === 0 ? (
+                  <EmptyCampaignState onCreateClick={() => setShowModal(true)} />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-left">
+                      <thead>
+                        <tr className="border-b border-white/[0.05] text-[10px] uppercase tracking-[0.14em] text-zinc-600">
+                          <th className="px-5 py-3 font-medium">Campaign Name</th>
+                          <th className="px-5 py-3 font-medium">Sync Code</th>
+                          <th className="px-5 py-3 font-medium">Assigned Creator</th>
+                          <th className="px-5 py-3 text-right font-medium">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {campaigns.map((campaign) => (
+                          <TableRow key={campaign.id} className="border-slate-800/50 hover:bg-slate-800/20 transition-colors group">
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-xs">
+                                  {campaign.sync_code ? campaign.sync_code.substring(0,2) : '?'}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-white">{campaign.campaign_name || campaign.sync_code}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <code className="text-xs font-mono text-zinc-400 bg-black/40 px-2 py-1 rounded border border-white/[0.05]">
+                                {campaign.sync_code}
+                              </code>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-zinc-300 font-mono text-xs">{campaign.creator_name || 'Pending Handshake'}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <button
+                                onClick={() => window.location.href = `/agency/campaign/${campaign.sync_code}`}
+                                className="text-xs font-mono text-orange-500 hover:text-orange-400 transition-colors"
+                              >
+                                View Telemetry
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            </>
+          ) : (
+            <div className="max-w-3xl space-y-6">
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold tracking-tight">Workspace Settings</h2>
+                <p className="mt-1 text-sm text-zinc-500">Manage your agency profile and billing preferences.</p>
               </div>
+
+              <section className="rounded-xl border border-white/[0.07] bg-[#111216] overflow-hidden shadow-lg">
+                <div className="border-b border-white/[0.07] px-6 py-4">
+                  <h3 className="text-sm font-semibold text-zinc-100">Agency Profile</h3>
+                </div>
+                <div className="p-6 flex flex-col gap-6">
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Workspace Name</p>
+                    <p className="text-sm font-medium text-zinc-200">{agencyName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Administrator Email</p>
+                    <p className="text-sm font-medium text-zinc-200">{userEmail}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-white/[0.07] bg-[#111216] overflow-hidden shadow-lg">
+                <div className="border-b border-white/[0.07] px-6 py-4">
+                  <h3 className="text-sm font-semibold text-zinc-100">Billing & Subscription</h3>
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-zinc-400 mb-5 leading-relaxed">
+                    We partner with Dodo Payments as our secure Merchant of Record. You can upgrade your tier, update your payment method, cancel your subscription, or download tax invoices directly from your secure customer portal.
+                  </p>
+                  <a href="https://customer.dodopayments.com/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-200 transition-colors border border-white/[0.05]">
+                    Open Billing Portal
+                    <svg className="size-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </section>
+              
+              <section className="rounded-xl border border-white/[0.07] bg-[#111216] overflow-hidden shadow-lg">
+                <div className="border-b border-white/[0.07] px-6 py-4">
+                  <h3 className="text-sm font-semibold text-zinc-100">Support</h3>
+                </div>
+                <div className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">Need engineering support?</p>
+                    <p className="text-sm text-zinc-500 mt-1">Contact us directly for custom telemetry integrations.</p>
+                  </div>
+                  <a href="mailto:livekit.support@gmail.com" className="text-sm font-medium text-orange-500 hover:text-orange-400 transition-colors">
+                    livekit.support@gmail.com
+                  </a>
+                </div>
+              </section>
             </div>
-            
-            {campaigns.length === 0 ? (
-              <EmptyCampaignState onCreateClick={() => setShowModal(true)} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left">
-                  <thead>
-                    <tr className="border-b border-white/[0.05] text-[10px] uppercase tracking-[0.14em] text-zinc-600">
-                      <th className="px-5 py-3 font-medium">Campaign Name</th>
-                      <th className="px-5 py-3 font-medium">Sync Code</th>
-                      <th className="px-5 py-3 font-medium">Assigned Creator</th>
-                      <th className="px-5 py-3 text-right font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {campaigns.map((campaign) => (
-                      <TableRow key={campaign.id} className="border-slate-800/50 hover:bg-slate-800/20 transition-colors group">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-xs">
-                              {campaign.sync_code ? campaign.sync_code.substring(0,2) : '?'}
-                            </div>
-                            <div>
-                              <div className="font-medium text-white">{campaign.campaign_name || campaign.sync_code}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <code className="text-xs font-mono text-zinc-400 bg-black/40 px-2 py-1 rounded border border-white/[0.05]">
-                            {campaign.sync_code}
-                          </code>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-zinc-300 font-mono text-xs">{campaign.creator_name || 'Pending Handshake'}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <button
-                            onClick={() => window.location.href = `/agency/campaign/${campaign.sync_code}`}
-                            className="text-xs font-mono text-orange-500 hover:text-orange-400 transition-colors"
-                          >
-                            View Telemetry
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+          )}
         </main>
       </div>
 
