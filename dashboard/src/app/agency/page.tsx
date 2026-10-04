@@ -93,17 +93,12 @@ export default function AgencyHub() {
     checkAuth();
   }, [router]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
-
-  // Load actual campaigns from Supabase
+  // Load actual campaigns from Supabase securely scoped to this agency
   useEffect(() => {
     if (!agencyId) return; // Wait for auth to resolve
 
     async function fetchDashboardData() {
-      // 1. Fetch campaigns for this specific agency
+      // 1. Fetch campaigns exclusively for this agency
       const { data: camps } = await supabase
         .from('campaigns')
         .select('*')
@@ -112,14 +107,35 @@ export default function AgencyHub() {
         
       if (camps) setCampaigns(camps);
 
-      // 2. Fetch All-Time Peak Payload
-      const { data: peakData } = await supabase.from('stream_intervals').select('interval_peak').order('interval_peak', { ascending: false }).limit(1);
-      if (peakData && peakData.length > 0) setAllTimePeak(peakData[0].interval_peak);
+      // If the agency has no campaigns, default metrics to 0 and stop fetching
+      if (!camps || camps.length === 0) {
+        setAllTimePeak(0);
+        setActiveCampaignsCount(0);
+        setGlobalLiveCcv(0);
+        return;
+      }
 
-      // 3. Fetch Active CCV (Find campaigns that sent telemetry in the last 2 minutes)
+      const syncCodes = camps.map(c => c.sync_code);
+
+      // 2. Fetch All-Time Peak CCV (Strictly filtered by this agency's Sync Codes)
+      const { data: peakData } = await supabase
+        .from('stream_intervals')
+        .select('interval_peak')
+        .in('sync_code', syncCodes)
+        .order('interval_peak', { ascending: false })
+        .limit(1);
+        
+      if (peakData && peakData.length > 0) {
+        setAllTimePeak(peakData[0].interval_peak);
+      } else {
+        setAllTimePeak(0);
+      }
+
+      // 3. Fetch Active CCV (Strictly filtered by this agency's Sync Codes)
       const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const { data: liveData } = await supabase.from('stream_intervals')
         .select('sync_code, platform, interval_peak')
+        .in('sync_code', syncCodes)
         .gte('recorded_at', twoMinsAgo);
 
       if (liveData) {
@@ -141,6 +157,11 @@ export default function AgencyHub() {
     const interval = setInterval(fetchDashboardData, 60000);
     return () => clearInterval(interval);
   }, [agencyId]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   const generateSyncCode = async () => {
     if (!campaignName.trim() || !creator) return;
@@ -247,7 +268,7 @@ export default function AgencyHub() {
             {[
               { label: 'Active Streams Right Now', value: String(activeCampaignsCount).padStart(2, '0'), change: 'Transmitting telemetry', icon: Radio, accent: true },
               { label: 'Global Concurrent Viewers', value: globalLiveCcv.toLocaleString(), change: 'Across all active campaigns', icon: Users },
-              { label: 'All-Time Peak Payload', value: allTimePeak.toLocaleString(), change: 'Highest single block recorded', icon: Gauge }
+              { label: 'All-Time Peak CCV', value: allTimePeak.toLocaleString(), change: 'Highest simultaneous audience reached', icon: Gauge }
             ].map(({ label, value, change, icon: Icon, accent }) => (
               <div key={label} className="rounded-xl border border-white/[0.07] bg-[#111216] p-5 shadow-lg">
                 <div className="flex items-start justify-between">
