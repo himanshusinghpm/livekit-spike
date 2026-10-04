@@ -1,9 +1,12 @@
 {
   "name": "LiveKit Telemetry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zero-friction, real-time cross-platform telemetry layer for creators and agencies.",
   "manifest_version": 3,
-  "permissions": ["alarms", "storage"],
+  "icons": {
+    "128": "icon128.png"
+  },
+  "permissions": ["alarms", "storage", "tabs", "scripting"],
   "host_permissions": [
     "*://*.kick.com/*",
     "*://*.youtube.com/*",
@@ -11,6 +14,11 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": {
+      "128": "icon128.png"
+    }
   },
   "content_scripts": [
     {
@@ -21,4 +29,3 @@
   ],
   "options_page": "options.html"
 }
-

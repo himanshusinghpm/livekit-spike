@@ -29,10 +29,43 @@ serve(async (req) => {
 
         const finalChannelName = channel_name || channel || 'unknown';
 
+        // Verify sync_code is live before writing. Defense-in-depth alongside
+        // the stream_intervals RLS policy (anon INSERTs without a valid code
+        // are rejected at the database even if this check is bypassed).
+        const code = (sync_code || '').trim();
+        if (!code) {
+            return new Response(JSON.stringify({ error: 'Missing sync_code' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 401,
+            });
+        }
+
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
+
+        const { data: lead } = await supabaseClient
+            .from('leads')
+            .select('sync_code,status')
+            .eq('sync_code', code)
+            .eq('status', 'active')
+            .maybeSingle();
+
+        if (!lead) {
+            const { data: camp } = await supabaseClient
+                .from('campaigns')
+                .select('sync_code,status')
+                .eq('sync_code', code)
+                .in('status', ['active', 'pending'])
+                .maybeSingle();
+            if (!camp) {
+                return new Response(JSON.stringify({ error: 'Invalid or expired Sync-Code' }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 403,
+                });
+            }
+        }
 
         const { data, error } = await supabaseClient
             .from('stream_intervals')
