@@ -79,7 +79,7 @@ async function verifySig(req: Request, raw: string): Promise<boolean> {
     return false;
   } catch { return false; }
 }
-export async function POST(req: Request) {
+async function handleDodoEvent(req: Request) {
   const raw = await req.text();
   let body: DodoEvent = {};
   try { body = JSON.parse(raw) as DodoEvent; } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
@@ -89,10 +89,23 @@ export async function POST(req: Request) {
   if (!okEvent) return NextResponse.json({ ok: true, ignored: type });
   const ref = getLeadRef(body);
   if (!ref) { console.warn('[dodo-webhook] no lead ref', type); return NextResponse.json({ ok: true, missing: true }); }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  if (!url || !key) return NextResponse.json({ ok: false }, { status: 500 });
-  const sb = createClient(url, key);
+  // RLS is ENABLED on public.leads (migration 20251003000000). The anon key has
+  // only a SELECT policy + SELECT grant, so it can read leads but can NEVER
+  // update them. Use the service-role key here, and deliberately do NOT fall back
+  // to the anon key — that would make every activation fail with a permission
+  // error instead of failing loudly at config time.
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!url || !serviceKey) {
+    console.error('[dodo-webhook] Supabase admin config missing', {
+      hasUrl: Boolean(url),
+      hasServiceRoleKey: Boolean(serviceKey),
+    });
+    return NextResponse.json({ ok: false, error: 'Supabase not configured' }, { status: 500 });
+  }
+  const sb = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
   const d = body.data || {};
   const dodoSubscriptionId = getSubId(d);
   const billingEmail = getBillEmail(d);
@@ -101,34 +114,90 @@ export async function POST(req: Request) {
   // updating so we only send ONE magic link. If status is already 'active',
   // an earlier webhook already provisioned + emailed — skip resending OTP
   // (duplicate signInWithOtp calls invalidate the prior token).
-  const { data: existing, error: fErr } = await sb.from('leads').select('id,status,email').eq('id', ref).single();
-  if (fErr || !existing) { console.error('[dodo-webhook] lead fetch failed', fErr?.message || 'lead not found'); return NextResponse.json({ ok: false }, { status: fErr ? 502 : 404 }); }
-  const wasAlreadyActive = (existing as { status?: string }).status === 'active';
+  // NOTE: no .single() on the reads/updates below. .single() makes PostgREST
+  // raise "Cannot coerce the result to a single JSON object" (PGRST116) whenever
+  // 0 or >1 rows come back, which surfaced as a 502 in the Vercel logs. We select
+  // arrays and branch on length instead so the route never throws on shape.
+  let existing: { id?: string; status?: string; email?: string } | null = null;
+  try {
+    const { data: rows, error: fErr } = await sb
+      .from('leads')
+      .select('id,status,email')
+      .eq('id', ref)
+      .limit(1);
+    if (fErr) throw fErr;
+    existing = (rows?.[0] as { id?: string; status?: string; email?: string } | undefined) ?? null;
+  } catch (fetchErr) {
+    console.error('[dodo-webhook] lead fetch failed', ref, (fetchErr as Error)?.message || fetchErr);
+    return NextResponse.json({ ok: false, error: 'Lead lookup failed' }, { status: 502 });
+  }
+  // Unknown lead: permanent condition. Acknowledge with 200 so Dodo stops retrying
+  // something that will never succeed, but surface it loudly in the logs.
+  if (!existing) {
+    console.error('[dodo-webhook] lead not found for ref', ref, '— event', type, 'acknowledged without activation');
+    return NextResponse.json({ ok: true, leadId: ref, activated: false, reason: 'lead_not_found' });
+  }
+  const wasAlreadyActive = existing.status === 'active';
   const patch: Record<string, string> = { status: 'active', trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() };
   if (dodoSubscriptionId) patch.dodo_subscription_id = dodoSubscriptionId;
   if (billingEmail) patch.billing_email = billingEmail;
-  const { data: lead, error: uErr } = await sb.from('leads').update(patch).eq('id', ref).select().single();
-  if (uErr || !lead) { console.error('[dodo-webhook] activate failed', uErr?.message || 'lead not found'); return NextResponse.json({ ok: false }, { status: uErr ? 502 : 404 }); }
-  const em = (lead as { email?: string }).email || '';
+  let lead: { id?: string; email?: string } | null = null;
+  try {
+    const { data: rows, error: uErr } = await sb.from('leads').update(patch).eq('id', ref).select('id,email');
+    if (uErr) throw uErr;
+    lead = (rows?.[0] as { id?: string; email?: string } | undefined) ?? null;
+  } catch (updateErr) {
+    console.error('[dodo-webhook] activate failed', ref, (updateErr as Error)?.message || updateErr);
+    return NextResponse.json({ ok: false, error: 'Activation failed' }, { status: 502 });
+  }
+  if (!lead) {
+    console.error('[dodo-webhook] activate matched no row for ref', ref, '— event', type);
+    return NextResponse.json({ ok: true, leadId: ref, activated: false, reason: 'update_matched_no_row' });
+  }
+  const em = lead.email || '';
   console.log(`[dodo-webhook] lead ${ref} ACTIVE via ${type} sub=${dodoSubscriptionId || 'n/a'} billing=${billingEmail || 'n/a'}. Send Sync-Code provisioning email to DB email ${em} (NOT billing email).`);
   if (wasAlreadyActive) {
     console.log(`[dodo-webhook] lead ${ref} was already active — skipping duplicate magic link (idempotency guard, event ${type}).`);
     return NextResponse.json({ ok: true, leadId: ref, dodoSubscriptionId, billingEmail, deduplicated: true });
   }
-  if (lead?.email) {
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '') || new URL(req.url).origin;
-    const { error: authError } = await sb.auth.signInWithOtp({
-      email: lead.email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${siteUrl}/agency`,
-      },
-    });
-    if (authError) {
-      console.error('Failed to send magic link:', authError);
-    } else {
-      console.log(`[dodo-webhook] magic link sent to Ops email ${lead.email} for lead ${ref}`);
+  // --- Email dispatch -----------------------------------------------------
+  // Mailer: Supabase Auth magic link via sb.auth.signInWithOtp (no Resend /
+  // Nodemailer / SMTP in this project). Activation is already committed above, so
+  // a mail failure must NOT fail the webhook — log it and still return 200 so Dodo
+  // does not retry (a retry would re-run this handler for an already-paid order).
+  let emailDispatched = false;
+  if (lead.email) {
+    try {
+      const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '') || new URL(req.url).origin;
+      const { error: authError } = await sb.auth.signInWithOtp({
+        email: lead.email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${siteUrl}/agency`,
+        },
+      });
+      if (authError) {
+        console.error('[dodo-webhook] magic link FAILED (lead still activated)', ref, authError.message || authError);
+      } else {
+        emailDispatched = true;
+        console.log(`[dodo-webhook] magic link sent to Ops email ${lead.email} for lead ${ref}`);
+      }
+    } catch (emailErr) {
+      console.error('[dodo-webhook] magic link threw (lead still activated)', ref, (emailErr as Error)?.message || emailErr);
     }
+  } else {
+    console.warn('[dodo-webhook] lead has no email on record; skipped magic link for', ref);
   }
-  return NextResponse.json({ ok: true, leadId: ref, dodoSubscriptionId, billingEmail });
+  return NextResponse.json({ ok: true, leadId: ref, dodoSubscriptionId, billingEmail, emailDispatched });
+}
+// Top-level backstop. A webhook handler must never throw: an uncaught rejection
+// becomes a 500, which Dodo counts as a delivery failure and retries forever on an
+// order that is already paid. Log the stack, acknowledge, and move on.
+export async function POST(req: Request) {
+  try {
+    return await handleDodoEvent(req);
+  } catch (err) {
+    console.error('[dodo-webhook] unhandled error', (err as Error)?.stack || err);
+    return NextResponse.json({ ok: true, error: 'Internal error (acknowledged)' });
+  }
 }
