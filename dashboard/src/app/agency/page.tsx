@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Activity, ChevronDown, Gauge, LayoutDashboard, LogOut, Menu, Plus, Radio, Settings, Users, X } from 'lucide-react';
+import { Activity, ChevronDown, Gauge, LayoutDashboard, LogOut, Menu, Plus, Radio, Settings, Users, X, ExternalLink } from 'lucide-react';
 
 function TableRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <tr className={className}>{children}</tr>;
@@ -232,10 +232,20 @@ export default function AgencyHub() {
               <h1 className="mt-0.5 text-lg font-semibold tracking-tight">Good morning, {agencyName.split(' ')[0]}</h1>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <span className="hidden items-center gap-2 text-xs text-zinc-500 sm:flex">
               <span className="size-1.5 rounded-full bg-emerald-400" />All systems operational
             </span>
+            
+            <a 
+              href="https://chromewebstore.google.com/detail/livekit-telemetry/ahokgecjpapboclhdbdgedodkefadcbn" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hidden items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-xs font-medium text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200 sm:flex"
+            >
+              Chrome Extension <ExternalLink className="size-3.5" />
+            </a>
+
             {activeNav === 'Overview' && (
               <button onClick={() => setShowModal(true)} className="flex items-center gap-2 rounded-lg bg-orange-500 px-3.5 py-2 text-xs font-semibold text-black shadow-lg shadow-orange-500/10 transition hover:bg-orange-400">
                 <Plus className="size-4" />Create Campaign
